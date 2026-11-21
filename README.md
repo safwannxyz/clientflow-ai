@@ -9,6 +9,8 @@ AI Automation Specialist / AI & Business Systems Engineer role.
 
 ---
 
+![Dashboard](docs/screenshots/dashboard.png)
+
 ## What it is
 
 A small platform that runs five automations for a group made of a law firm, a recruitment business, a
@@ -38,6 +40,8 @@ python -m clientflow.cli serve          # dashboard on http://127.0.0.1:8770
 
 Then open <http://127.0.0.1:8770/> for the dashboard and
 <http://127.0.0.1:8770/?review=3> to watch a contract being reviewed.
+
+![Clause review](docs/screenshots/clause-review.png)
 
 ## The clause review — the part worth explaining
 
