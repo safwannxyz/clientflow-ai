@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local database and generated output
+*.db
+*.db-wal
+*.db-shm
+clientflow.db
+digest.md
+report.html
+*.log
+
+# CUAD corpus and trained artefacts are downloaded/trained locally, not committed
+clientflow/data/cuad/
+clientflow/data/models/
+clientflow/data/samples/CUAD_v1.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
