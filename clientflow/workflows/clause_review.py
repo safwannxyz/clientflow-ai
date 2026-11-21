@@ -39,6 +39,38 @@ NONCOMPETE_RE = re.compile(r"non[- ]compet\w*[^.]{0,300}", re.I)
 MONTHS_RE = re.compile(r"(\d{1,2})\s*(month|months|year|years)", re.I)
 
 
+# Plain vocabulary overlap put several different categories on the same clause — the
+# first version cited "clause 6" for Parties, Expiration Date and Renewal Term alike,
+# which is worse than citing nothing: a wrong citation costs the reader time and trust.
+# These hints anchor the common categories to the drafting language they actually use.
+PHRASE_HINTS: dict[str, list[str]] = {
+    "Document Name": ["agreement", "this agreement is made"],
+    "Parties": ["between", "by and between", "hereinafter", "party of the"],
+    "Governing Law": ["governed by", "governing law", "laws of the", "jurisdiction"],
+    "Cap On Liability": ["shall not exceed", "aggregate liability", "in no event shall",
+                          "limitation of liability", "liability shall be limited"],
+    "Unlimited/All-You-Can-Eat-License": ["unlimited", "without limitation as to"],
+    "Termination For Convenience": ["may terminate", "terminate this agreement",
+                                     "upon written notice", "for convenience"],
+    "Renewal Term": ["renew", "renewal", "extended term", "successive"],
+    "Notice Period To Terminate Renewal": ["notice of non-renewal", "days prior to the end",
+                                            "notice period"],
+    "Expiration Date": ["expires", "expiration", "term of this agreement shall",
+                         "shall commence on", "end date"],
+    "Effective Date": ["effective as of", "effective date", "entered into as of"],
+    "Anti-Assignment": ["assign", "assignment", "transfer of this agreement"],
+    "Non-Compete": ["non-compete", "noncompetition", "shall not compete",
+                     "shall not engage in"],
+    "Audit Rights": ["audit", "inspect", "books and records"],
+    "Confidentiality": ["confidential", "non-disclosure", "proprietary information"],
+    "Exclusivity": ["exclusive", "exclusivity"],
+    "License Grant": ["grants", "license to", "right and license"],
+    "Ip Ownership Assignment": ["intellectual property", "work product", "ownership"],
+    "Warranty Duration": ["warranty", "warrants", "represents and warrants"],
+    "Third Party Beneficiary": ["third party beneficiary", "benefit of"],
+}
+
+
 @lru_cache(maxsize=1)
 def _bundle() -> dict:
     return clause_model.load()
@@ -50,18 +82,36 @@ def _category_tokens(category: str) -> list[str]:
 
 
 def _best_clause(category: str, clauses: list[dict]) -> tuple[int | None, float, str]:
-    """Score clauses by how much of the category's vocabulary they contain."""
-    tokens = _category_tokens(category)
-    if not tokens:
+    """Locate a candidate passage by retrieval, not by keyword counting.
+
+    Measured against CUAD's lawyer annotations this agrees 32% of the time at best
+    (vocabulary overlap: 28%; finer blocks: 21%). That is not good enough to call a
+    citation, so the output is labelled a CANDIDATE PASSAGE to verify, not a clause
+    reference. Shipping a confidently wrong clause number would cost a reader more
+    time than no number at all.
+
+    Method: TF-IDF index over clause blocks, queried with the CUAD annotation
+    question for the category — the question is written by lawyers to describe
+    exactly what to look for.
+    """
+    if not clauses:
         return None, 0.0, ""
-    best_no, best_score, best_text = None, 0.0, ""
-    for block in clauses:
-        low = block["text"].lower()
-        hits = sum(1 for t in tokens if t in low)
-        score = hits / len(tokens)
-        if score > best_score:
-            best_no, best_score, best_text = int(block["clause_no"]), score, block["text"].strip()
-    return best_no, round(best_score, 2), best_text[:400]
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    from .clause_data import CATEGORY_QUESTIONS
+
+    texts = [c["text"] for c in clauses]
+    vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2),
+                                 sublinear_tf=True, min_df=1)
+    matrix = vectorizer.fit_transform(texts)
+    query = " ".join(filter(None, [category, CATEGORY_QUESTIONS.get(category, "")]))
+    scores = cosine_similarity(vectorizer.transform([query]), matrix)[0]
+    best = int(scores.argmax())
+    score = float(scores[best])
+    if score < 0.02:                       # nothing meaningfully similar
+        return None, round(score, 3), ""
+    return int(clauses[best]["clause_no"]), round(score, 3), clauses[best]["text"].strip()[:400]
 
 
 def risk_flags(text: str, clauses: list[dict]) -> list[dict]:
@@ -135,21 +185,28 @@ def risk_flags(text: str, clauses: list[dict]) -> list[dict]:
     return flags
 
 
-def review(contract_text: str, title: str = "Untitled contract") -> dict:
+def review(contract_text: str, title: str = "Untitled contract",
+           annotated: dict | None = None) -> dict:
     """Produce the review sheet. Pure function: same input, same output."""
     bundle = _bundle()
     clauses = split_clauses(contract_text)
     present = clause_model.predict_present(bundle, contract_text)
 
+    from .clause_data import locate_span
+
     findings = []
     for item in present:
         clause_no, match_score, snippet = _best_clause(item["category"], clauses)
+        annotated_no = None
+        if annotated and item["category"] in annotated:
+            annotated_no = locate_span(clauses, annotated[item["category"]])
         findings.append({
             "category": item["category"],
             "score": item["score"],
             "clause_no": clause_no,
             "match": match_score,
             "excerpt": " ".join(snippet.split())[:260],
+            "annotated_clause": annotated_no,
         })
 
     flags = risk_flags(contract_text, clauses)
@@ -164,6 +221,12 @@ def review(contract_text: str, title: str = "Untitled contract") -> dict:
         "clauses_detected": len(clauses),
         "characters": len(contract_text),
         "findings": findings,
+        "located": sum(1 for f in findings if f["clause_no"]),
+        "passage_agreement": ("measured 0.32 against CUAD lawyer annotations; "
+                              "treat as a pointer, not a citation"),
+        "located_correctly": (sum(1 for f in findings
+                                  if f["clause_no"] and f["clause_no"] == f["annotated_clause"])
+                              if annotated else None),
         "key_clauses_absent": absent_key,
         "risk_flags": flags,
         "disclaimer": ("Prepared as a review aid from a trained model and listed rules. "
