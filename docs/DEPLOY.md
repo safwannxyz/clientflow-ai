@@ -45,5 +45,5 @@ Or use the Render blueprint (`render.yaml`):
 
 ## CI
 
-`.github/workflows/ci.yml` installs dependencies, fetches CUAD, trains, runs the 52 tests, smoke-tests
+`.github/workflows/ci.yml` installs dependencies, fetches CUAD, trains, runs the 55 tests, smoke-tests
 the CLI and fails the build on an obvious committed secret.

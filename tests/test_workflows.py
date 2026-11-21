@@ -151,6 +151,25 @@ class ClauseReviewTests(unittest.TestCase):
         self.assertGreater(len(result["findings"]), 0)
         self.assertTrue(any(f["clause_no"] for f in result["findings"]))
 
+    def test_governing_law_false_positive_is_not_flagged(self):
+        """"governed by separate agreement" is not a governing-law clause."""
+        from clientflow.workflows.clause_review import risk_flags
+        text = "The parties will act as governed by separate agreement(s) between them."
+        checks = {f["check"] for f in risk_flags(text, [])}
+        self.assertNotIn("Governing law outside the UAE", checks)
+
+    def test_foreign_governing_law_is_flagged(self):
+        from clientflow.workflows.clause_review import risk_flags
+        text = "This Agreement shall be governed by the laws of the State of Kansas."
+        flags = risk_flags(text, [])
+        self.assertIn("Governing law outside the UAE", {f["check"] for f in flags})
+
+    def test_uae_governing_law_is_not_flagged(self):
+        from clientflow.workflows.clause_review import risk_flags
+        text = "This Agreement is governed by the laws of the Dubai International Financial Centre."
+        checks = {f["check"] for f in risk_flags(text, [])}
+        self.assertNotIn("Governing law outside the UAE", checks)
+
     def test_review_always_carries_disclaimer(self):
         from clientflow.workflows.clause_review import review
         result = review("Short agreement with no clauses at all.")

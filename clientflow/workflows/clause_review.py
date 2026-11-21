@@ -31,10 +31,18 @@ STOPWORDS = {"with", "that", "this", "from", "into", "than", "then", "they", "th
 # "governing law" as a phrase is often absent; contracts usually say "governed by
 # the laws of ...". Matching only the literal phrase produced false "missing clause"
 # findings on contracts that clearly had one — found by running it on real files.
+# "governing law" as a phrase is often absent; contracts usually say "governed by
+# the laws of ...". An earlier version matched any "governed by", which flagged
+# "governed by separate agreement(s)" as a governing-law clause — a false positive
+# that would waste a reviewer's time. The fragment must name laws or a jurisdiction.
 GOVERNING_LAW_RE = re.compile(
-    r"(governing law|governed by[^.]{0,160}|laws of[^.]{0,120}|exclusive jurisdiction[^.]{0,160})",
+    r"(governing law[^.]{0,160}"
+    r"|governed by the laws?[^.]{0,140}"
+    r"|laws of (?:the )?(?:state|emirate|country|united|england|uae|dubai)[^.]{0,80}"
+    r"|exclusive jurisdiction[^.]{0,160})",
     re.I,
 )
+
 NONCOMPETE_RE = re.compile(r"non[- ]compet\w*[^.]{0,300}", re.I)
 MONTHS_RE = re.compile(r"(\d{1,2})\s*(month|months|year|years)", re.I)
 
