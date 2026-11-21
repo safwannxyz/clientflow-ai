@@ -1,0 +1,4 @@
+# ClientFlow AI runs on the standard library plus these two packages.
+# Everything else (queue, audit, API, dashboard, CLI) is stdlib by design.
+scikit-learn>=1.5,<2.0
+numpy>=1.26,<3.0

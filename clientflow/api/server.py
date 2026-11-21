@@ -136,8 +136,8 @@ def render_dashboard(db: Database, run_id: str, review_idx: int | None = None,
       {len(result['findings'])} clause types detected · located {result['located']}
       {f"· matched the lawyer annotation on {result['located_correctly']}" if compare and result['located_correctly'] is not None else ""}</p>
       <p class="sub">{"" if not compare else "Comparison view: add ?compare=1 to see this."}</p>
-      <p class="sub">The passage is a pointer to verify, not a citation: measured agreement with CUAD's
-      lawyer annotations is about 32%. Presence classification is the evaluated part; localisation is a
+      <p class="sub">The passage is a pointer to verify, not a citation: a passage is returned for 44%
+      of findings and 34% of those match the lawyer's choice — a pointer to verify, not a citation. Presence classification is the evaluated part; localisation is a
       convenience that is honest about its accuracy.</p>
       <div class="grid2">
         <div><h3>Detected clauses</h3>

@@ -16,7 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install scikit-learn numpy
+        run: pip install -r requirements.txt
 
       - name: Fetch CUAD and train the clause model
         run: |

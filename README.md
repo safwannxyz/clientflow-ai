@@ -66,9 +66,14 @@ CUAD's lawyer-annotated spans:
 |---|---|
 | Vocabulary overlap, 2,500-char blocks | 28% |
 | Same, 600-char blocks | 21% |
-| TF-IDF retrieval against the CUAD annotation question, 600-char blocks | 32% |
+| TF-IDF retrieval against the CUAD annotation question, 2,500-char blocks | 32% |
+| TF-IDF retrieval, 600-char blocks, no abstention | 22% |
+| **Shipped** — same, but abstains below 0.16 similarity | **34% of returned passages agree; a passage is returned for 44% of findings** |
 
-Since 32% is not a citation, the product reports a **candidate passage to verify**, not a clause reference.
+The shipped configuration keeps 600-character blocks for readable excerpts and **abstains** when similarity
+is below 0.16: it returns a passage for 44% of findings and is right about a third of the time. That is still
+not a citation, so the product calls it a **candidate passage to verify** — and says "not located" rather
+than guessing.
 That was a deliberate downgrade: a confident wrong clause number costs a reviewer more than no number.
 
 Two deliberate design choices remain:

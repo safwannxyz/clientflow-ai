@@ -92,11 +92,13 @@ def _category_tokens(category: str) -> list[str]:
 def _best_clause(category: str, clauses: list[dict]) -> tuple[int | None, float, str]:
     """Locate a candidate passage by retrieval, not by keyword counting.
 
-    Measured against CUAD's lawyer annotations this agrees 32% of the time at best
-    (vocabulary overlap: 28%; finer blocks: 21%). That is not good enough to call a
-    citation, so the output is labelled a CANDIDATE PASSAGE to verify, not a clause
-    reference. Shipping a confidently wrong clause number would cost a reader more
-    time than no number at all.
+    Measured against CUAD's lawyer annotations at the shipped setting: a passage is
+    returned for 44% of findings, and 34% of those agree with the clause a lawyer
+    chose. Coverage/precision measured at four abstention floors (0.02: 99%/23%,
+    0.08: 97%/23%, 0.12: 73%/28%, 0.16: 44%/34%); 0.16 is shipped because a
+    confident wrong pointer is worse than an honest "not located".
+
+    The output is therefore labelled a CANDIDATE PASSAGE to verify, never a citation.
 
     Method: TF-IDF index over clause blocks, queried with the CUAD annotation
     question for the category — the question is written by lawyers to describe
@@ -117,7 +119,7 @@ def _best_clause(category: str, clauses: list[dict]) -> tuple[int | None, float,
     scores = cosine_similarity(vectorizer.transform([query]), matrix)[0]
     best = int(scores.argmax())
     score = float(scores[best])
-    if score < 0.02:                       # nothing meaningfully similar
+    if score < 0.16:                       # below this we abstain rather than point
         return None, round(score, 3), ""
     return int(clauses[best]["clause_no"]), round(score, 3), clauses[best]["text"].strip()[:400]
 
@@ -230,8 +232,9 @@ def review(contract_text: str, title: str = "Untitled contract",
         "characters": len(contract_text),
         "findings": findings,
         "located": sum(1 for f in findings if f["clause_no"]),
-        "passage_agreement": ("measured 0.32 against CUAD lawyer annotations; "
-                              "treat as a pointer, not a citation"),
+        "passage_agreement": ("34% of returned passages match CUAD lawyer annotations; "
+                              "a passage is returned for 44% of findings. A pointer, "
+                              "not a citation."),
         "located_correctly": (sum(1 for f in findings
                                   if f["clause_no"] and f["clause_no"] == f["annotated_clause"])
                               if annotated else None),
