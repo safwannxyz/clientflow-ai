@@ -1,0 +1,17 @@
+# Render blueprint. Deploys ClientFlow as a single web service.
+# Note: SQLite lives on a persistent disk, so this is a one-instance deployment by
+# design — a queue and database in one file cannot be horizontally scaled, and
+# pretending otherwise would be the dishonest choice.
+services:
+  - type: web
+    name: clientflow-ai
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: CLIENTFLOW_API_TOKEN
+        generateValue: true       # Render generates it; never commit a token
+    disk:
+      name: clientflow-data
+      mountPath: /data
+      sizeGB: 1

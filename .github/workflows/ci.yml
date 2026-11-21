@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install scikit-learn numpy
+
+      - name: Fetch CUAD and train the clause model
+        run: |
+          python -m clientflow.cli fetch-cuad
+          python -m clientflow.cli train
+
+      - name: Run the test suite
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Smoke-test the CLI end to end
+        run: |
+          python -m clientflow.cli demo --reset
+          python -m clientflow.cli review 3 | head -30
+
+      - name: Guard against committed secrets
+        run: |
+          ! grep -rInE "sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}" clientflow/ \
+            && echo "no obvious secrets found"
