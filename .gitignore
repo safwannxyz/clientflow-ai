@@ -24,3 +24,6 @@ clientflow/data/samples/CUAD_v1.json
 Thumbs.db
 .idea/
 .vscode/
+
+# Generated static snapshot (rebuild with scripts/snapshot.py)
+dist/
