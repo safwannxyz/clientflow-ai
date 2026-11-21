@@ -84,12 +84,17 @@ def require(role: Role | str, capability: str) -> None:
 
 
 # ---- token -----------------------------------------------------------------
-TOKEN_ENV = "BUREAU_API_TOKEN"
+TOKEN_ENV = "CLIENTFLOW_API_TOKEN"
 
 
 def api_token() -> str | None:
     """Read the token from the environment at call time, never at import time,
-    and never from a file in the repository."""
+    and never from a file in the repository.
+
+    The variable name must match what the docs and the tests use: this module was
+    carried over from an earlier prototype that used a different name, which made
+    every documented token silently fail. Caught by the API test, not by reading.
+    """
     return os.environ.get(TOKEN_ENV) or None
 
 
