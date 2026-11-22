@@ -81,6 +81,7 @@ PHRASE_HINTS: dict[str, list[str]] = {
 
 @lru_cache(maxsize=1)
 def _bundle() -> dict:
+    """Cached model bundle. Raises clause_model.ModelUnavailable with the fix."""
     return clause_model.load()
 
 

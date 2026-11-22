@@ -87,7 +87,11 @@ def cmd_stats(db: Database) -> None:
 
 def cmd_review(db: Database, idx: int) -> None:
     from .workflows import clause_data, clause_review
-    docs = clause_data.load_cuad()
+    try:
+        docs = clause_data.load_cuad()
+    except FileNotFoundError:
+        print("Corpus not found. Run: python -m clientflow.cli fetch-cuad")
+        raise SystemExit(1)
     doc = docs[idx]
     result = clause_review.review(doc.text, doc.title)
     print(f"Contract: {result['title']}")
@@ -109,7 +113,16 @@ def cmd_review(db: Database, idx: int) -> None:
 
 def cmd_train() -> None:
     from .workflows import clause_data, clause_model
-    docs_ = clause_data.load_cuad()
+    try:
+        clause_model._require_sklearn()
+    except clause_model.ModelUnavailable as exc:
+        print(exc)
+        raise SystemExit(1)
+    try:
+        docs_ = clause_data.load_cuad()
+    except FileNotFoundError:
+        print("Corpus not found. Run: python -m clientflow.cli fetch-cuad")
+        raise SystemExit(1)
     bundle = clause_model.train(docs_)
     path = clause_model.save(bundle)
     m = bundle["metrics"]
@@ -164,12 +177,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "review":
         db = _db(args)
-        if args.json:
-            from .workflows import clause_data, clause_review
-            docs_ = clause_data.load_cuad()
-            print(json.dumps(clause_review.review(docs_[args.idx].text, docs_[args.idx].title), indent=2))
-        else:
-            cmd_review(db, args.idx)
+        try:
+            if args.json:
+                from .workflows import clause_data, clause_review
+                docs_ = clause_data.load_cuad()
+                print(json.dumps(clause_review.review(docs_[args.idx].text, docs_[args.idx].title),
+                                 indent=2))
+            else:
+                cmd_review(db, args.idx)
+        except Exception as exc:                    # ModelUnavailable with the fix inside
+            print(f"Clause review unavailable: {exc}")
+            db.close()
+            return 1
         db.close()
         return 0
     if args.command == "serve":

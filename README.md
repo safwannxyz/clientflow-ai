@@ -27,21 +27,31 @@ was designed against.
 
 ## Quick start
 
-Python 3.10+ and the standard library, plus `scikit-learn` and `numpy` for the clause model.
+Python 3.10+ with `scikit-learn` and `numpy` for the clause model. Everything else is the standard
+library.
 
-```bash
-pip install scikit-learn numpy
+```powershell
+.\bootstrap.ps1          # creates .venv, installs, fetches CUAD, trains, seeds, runs the tests
+```
 
-python -m clientflow.cli fetch-cuad     # 39 MB, once
-python -m clientflow.cli train          # about 20 seconds
-python -m clientflow.cli demo --reset   # seed, run the queue, print a summary
-python -m clientflow.cli serve          # dashboard on http://127.0.0.1:8770
+Or step by step:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m clientflow.cli fetch-cuad
+.\.venv\Scripts\python.exe -m clientflow.cli train
+.\.venv\Scripts\python.exe -m clientflow.cli demo --reset
+.\.venv\Scripts\python.exe -m clientflow.cli serve
 ```
 
 Then open <http://127.0.0.1:8770/> for the dashboard and
 <http://127.0.0.1:8770/?review=3> to watch a contract being reviewed.
 
-![Clause review](docs/screenshots/clause-review.png)
+**Use the venv interpreter explicitly.** Running a bare `python` picks up whatever is on `PATH`, and if
+that interpreter has no scikit-learn the clause model cannot load. The app degrades rather than crashing —
+the dashboard, queue, audit and five of the six workflows keep working, and the clause panel says exactly
+which command fixes it — but the model will not run.
 
 ## The clause review — the part worth explaining
 

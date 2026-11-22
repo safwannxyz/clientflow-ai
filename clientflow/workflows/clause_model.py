@@ -28,11 +28,38 @@ import pickle
 from pathlib import Path
 
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import f1_score, precision_score, recall_score
-from sklearn.model_selection import train_test_split
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.svm import LinearSVC
+
+# scikit-learn is only needed by this module. Importing it defensively keeps the
+# rest of the platform usable without it — the dashboard, the queue, the audit and
+# the other five workflows have no dependency on the clause model. Learned the hard
+# way: a missing sklearn used to take the whole app down because server.py imports
+# clause_review at module level.
+try:  # pragma: no cover - exercised by the "no sklearn" test path
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics import f1_score, precision_score, recall_score
+    from sklearn.model_selection import train_test_split
+    from sklearn.multiclass import OneVsRestClassifier
+    from sklearn.svm import LinearSVC
+    SKLEARN_AVAILABLE = True
+    SKLEARN_ERROR = ""
+except ImportError as exc:  # pragma: no cover
+    SKLEARN_AVAILABLE = False
+    SKLEARN_ERROR = str(exc)
+
+
+class ModelUnavailable(RuntimeError):
+    """Raised when the clause model cannot be used, with the fix in the message."""
+
+
+def _require_sklearn() -> None:
+    if not SKLEARN_AVAILABLE:
+        raise ModelUnavailable(
+            "scikit-learn is not installed in this interpreter "
+            f"({SKLEARN_ERROR}). Install it with:\n"
+            "  ./.venv/Scripts/python.exe -m pip install -r requirements.txt\n"
+            "or run every command through ./.venv/Scripts/python.exe. "
+            "Everything except the clause model works without it."
+        )
 
 from .clause_data import ClauseDoc, categories
 
@@ -47,6 +74,7 @@ def build_matrix(docs: list[ClauseDoc], cats: list[str]) -> tuple[list[str], np.
 
 def train(docs: list[ClauseDoc], test_size: float = 0.2, seed: int = 42) -> dict:
     """Train on a contract-level split and return weights + honest metrics."""
+    _require_sklearn()
     cats = categories(docs)
     X_text, y = build_matrix(docs, cats)
 
@@ -107,7 +135,15 @@ def save(bundle: dict, path: Path | str = MODEL_PATH) -> Path:
 
 
 def load(path: Path | str = MODEL_PATH) -> dict:
-    with Path(path).open("rb") as fh:
+    _require_sklearn()
+    path = Path(path)
+    if not path.exists():
+        raise ModelUnavailable(
+            f"No trained model at {path}. Build it with:\n"
+            "  python -m clientflow.cli fetch-cuad\n"
+            "  python -m clientflow.cli train"
+        )
+    with path.open("rb") as fh:
         return pickle.load(fh)
 
 

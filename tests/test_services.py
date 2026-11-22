@@ -47,6 +47,39 @@ class MetricTests(unittest.TestCase):
         self.assertTrue(all(isinstance(line, str) for line in lines))
 
 
+class DegradationTests(unittest.TestCase):
+    """The dashboard must survive a missing corpus or a missing scikit-learn.
+
+    Found the hard way: a bare `python` without scikit-learn took the whole app
+    down, because server.py imports the clause workflow at module level.
+    """
+
+    def test_clause_panel_reports_missing_corpus(self):
+        from unittest import mock
+        from clientflow.api import server
+        with mock.patch.object(server.clause_data, "load_cuad",
+                               side_effect=FileNotFoundError("no file")):
+            html_out = server._clause_panel(3, False)
+        self.assertIn("Corpus not found", html_out)
+        self.assertIn("fetch-cuad", html_out)
+
+    def test_clause_panel_reports_unavailable_model(self):
+        from unittest import mock
+        from clientflow.api import server
+        from clientflow.workflows.clause_model import ModelUnavailable
+        with mock.patch.object(server.clause_data, "load_cuad",
+                               side_effect=ModelUnavailable("scikit-learn is not installed")):
+            html_out = server._clause_panel(3, False)
+        self.assertIn("Corpus unreadable", html_out)
+
+    def test_model_unavailable_message_names_the_fix(self):
+        from clientflow.workflows.clause_model import ModelUnavailable
+        with self.assertRaises(ModelUnavailable):
+            # an absent artefact must raise with an instruction, not a bare IOError
+            from clientflow.workflows import clause_model
+            clause_model.load("does/not/exist.pkl")
+
+
 class ApprovalTests(unittest.TestCase):
     def setUp(self):
         self.tmp = TempDB()

@@ -15,6 +15,26 @@ Not verified: a **fresh Windows virtual environment created from scratch on this
 job is the clean-environment evidence; the Windows path below is the command set that was run here, not a
 from-zero proof. Say that if asked — it is still a clean install on a machine that never had these files.
 
+## The failure that actually happened, and what was done about it
+
+Running the quick-start with a bare `python` on this machine produced:
+
+```
+ModuleNotFoundError: No module named 'sklearn'
+```
+
+That interpreter had no scikit-learn. Two fixes, both now in the repository:
+
+1. **`bootstrap.ps1`** creates `.venv`, installs from `requirements.txt`, fetches, trains, seeds and runs
+   the tests — one command, correct interpreter.
+2. **Graceful degradation.** The clause model is now an optional dependency at import time. Without it the
+   dashboard, API, queue, audit and five workflows still run; `/api/review` returns 503 with the reason,
+   the dashboard shows "Model unavailable" plus the exact command, and `cli review` prints the fix instead
+   of a traceback. A missing analysis library must not take the enquiry queue down with it.
+
+Verified on both interpreters: the system Python (no scikit-learn) runs `demo`, `serve` and
+`scripts/snapshot.py`; `.venv` runs everything including `train` and `review`.
+
 ## PowerShell, from nothing
 
 ```powershell

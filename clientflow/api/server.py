@@ -55,6 +55,67 @@ def _table(headers: list[str], rows: list[list[str]], empty: str = "None") -> st
     return f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
 
 
+def _clause_panel(review_idx: int, compare: bool) -> str:
+    """Build the clause-review panel, degrading instead of crashing.
+
+    The dashboard must render even when the corpus is missing, scikit-learn is not
+    installed, or the model file is absent — those are environment problems, not
+    reasons to lose the enquiry queue. Each failure gets its own sentence with the
+    command that fixes it.
+    """
+    try:
+        docs = clause_data.load_cuad()
+    except FileNotFoundError:
+        return ('<h2>Clause review</h2><div class="disclaimer"><b>Corpus not found.</b> '
+                "Run <code>python -m clientflow.cli fetch-cuad</code> then "
+                "<code>python -m clientflow.cli train</code>. The rest of the dashboard works "
+                "without it.</div>")
+    except Exception as exc:                                    # malformed file
+        return ('<h2>Clause review</h2><div class="disclaimer"><b>Corpus unreadable.</b> '
+                f"{html.escape(str(exc))[:300]}</div>")
+
+    if not (0 <= review_idx < len(docs)):
+        return ('<h2>Clause review</h2><div class="disclaimer">'
+                f"No contract at index {review_idx}; the corpus has {len(docs)}.</div>")
+
+    doc = docs[review_idx]
+    try:
+        result = clause_review.review(doc.text, doc.title, annotated=doc.spans)
+    except Exception as exc:      # ModelUnavailable, missing sklearn, bad pickle
+        return ('<h2>Clause review</h2><div class="disclaimer"><b>Model unavailable.</b><br>'
+                f"<code>{html.escape(str(exc))[:600]}</code></div>")
+
+    def where(finding: dict) -> str:
+        ours = f"passage {finding['clause_no']}" if finding["clause_no"] else "not located"
+        if not compare:
+            return ours
+        truth = f"passage {finding['annotated_clause']}" if finding["annotated_clause"] else "—"
+        mark = "✓" if finding["clause_no"] and finding["clause_no"] == finding["annotated_clause"] else "≠"
+        return f"{ours} <span class='muted'>{mark} CUAD {truth}</span>"
+
+    finding_rows = [[html.escape(f["category"]), where(f), f"{f['score']:.2f}",
+                     html.escape(f["excerpt"][:110])] for f in result["findings"][:12]]
+    flag_rows = [[_badge(f["severity"], "danger" if f["severity"] == "high" else "warn"),
+                  html.escape(f["check"]), html.escape(f["detail"][:110])]
+                 for f in result["risk_flags"]]
+    match_note = (f" · matched the lawyer annotation on {result['located_correctly']}"
+                  if compare and result["located_correctly"] is not None else "")
+
+    return f"""
+      <h2>Clause review — {html.escape(doc.title[:70])}</h2>
+      <p class="sub">{result['clauses_detected']} clause blocks · {result['characters']:,} characters ·
+      {len(result['findings'])} clause types detected · located {result['located']}{match_note}</p>
+      <p class="sub">A passage is returned for 44% of findings and matches the lawyer's choice 34% of the
+      time — a pointer to verify, never a citation. Presence classification is the evaluated part.</p>
+      <div class="grid2">
+        <div><h3>Detected clauses</h3>
+          {_table(["Category", "Candidate passage", "Score", "Excerpt"], finding_rows)}</div>
+        <div><h3>Risk items</h3>
+          {_table(["Severity", "Check", "Why"], flag_rows, "No risk items matched")}</div>
+      </div>
+      <p class="disclaimer">{html.escape(result['disclaimer'])}</p>"""
+
+
 def render_dashboard(db: Database, run_id: str, review_idx: int | None = None,
                      compare: bool = False) -> str:
     ov = metrics.overview(db)
@@ -109,43 +170,7 @@ def render_dashboard(db: Database, run_id: str, review_idx: int | None = None,
                    html.escape(a["entity"]), html.escape(a["detail"][:90])]
                   for a in db.q("SELECT * FROM audit_log ORDER BY id DESC LIMIT 10")]
 
-    review_html = ""
-    if review_idx is not None:
-        docs = clause_data.load_cuad()
-        if 0 <= review_idx < len(docs):
-            doc = docs[review_idx]
-            result = clause_review.review(doc.text, doc.title, annotated=doc.spans)
-            def _where(f):
-                ours = f"passage {f['clause_no']}" if f["clause_no"] else "none"
-                if not compare:
-                    return ours
-                truth = f"passage {f['annotated_clause']}" if f["annotated_clause"] else "—"
-                mark = "✓" if f["clause_no"] and f["clause_no"] == f["annotated_clause"] else "≠"
-                return f"{ours} <span class='muted'>{mark} CUAD {truth}</span>"
-            finding_rows = [[html.escape(f["category"]),
-                             _where(f),
-                             f"{f['score']:.2f}",
-                             html.escape(f["excerpt"][:110])]
-                            for f in result["findings"][:12]]
-            flag_rows = [[_badge(f["severity"], "danger" if f["severity"] == "high" else "warn"),
-                          html.escape(f["check"]), html.escape(f["detail"][:110])]
-                         for f in result["risk_flags"]]
-            review_html = f"""
-      <h2>Clause review — {html.escape(doc.title[:70])}</h2>
-      <p class="sub">{result['clauses_detected']} clause blocks · {result['characters']:,} characters ·
-      {len(result['findings'])} clause types detected · located {result['located']}
-      {f"· matched the lawyer annotation on {result['located_correctly']}" if compare and result['located_correctly'] is not None else ""}</p>
-      <p class="sub">{"" if not compare else "Comparison view: add ?compare=1 to see this."}</p>
-      <p class="sub">The passage is a pointer to verify, not a citation: a passage is returned for 44%
-      of findings and 34% of those match the lawyer's choice — a pointer to verify, not a citation. Presence classification is the evaluated part; localisation is a
-      convenience that is honest about its accuracy.</p>
-      <div class="grid2">
-        <div><h3>Detected clauses</h3>
-          {_table(["Category", "Candidate passage", "Score", "Excerpt"], finding_rows)}</div>
-        <div><h3>Risk items</h3>
-          {_table(["Severity", "Check", "Why"], flag_rows, "No risk items matched")}</div>
-      </div>
-      <p class="disclaimer">{html.escape(result['disclaimer'])}</p>"""
+    review_html = _clause_panel(review_idx, compare) if review_idx is not None else ""
 
     cards = [
         ("Enquiries", ov["enquiries"]["total"], "processed from four channels"),
@@ -269,13 +294,21 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/attribution":
                 return self._json(metrics.attribution(db))
             if path == "/api/review":
-                docs = clause_data.load_cuad()
+                try:
+                    docs = clause_data.load_cuad()
+                except FileNotFoundError:
+                    return self._json({"error": "corpus not found — run `cli fetch-cuad`"}, 503)
+                except Exception as exc:
+                    return self._json({"error": f"corpus unreadable: {exc}"}, 503)
                 if "idx" in query:
                     idx = int(query["idx"][0])
                     if not (0 <= idx < len(docs)):
                         return self._json({"error": "idx out of range"}, 404)
                     doc = docs[idx]
-                    return self._json(clause_review.review(doc.text, doc.title))
+                    try:
+                        return self._json(clause_review.review(doc.text, doc.title))
+                    except Exception as exc:
+                        return self._json({"error": f"model unavailable: {exc}"}, 503)
                 if "text" in query:
                     return self._json(clause_review.review(query["text"][0]))
                 return self._json({"error": "pass ?idx=N or ?text=..."}, 400)
