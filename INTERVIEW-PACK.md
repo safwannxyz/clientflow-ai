@@ -4,6 +4,7 @@ Everything needed to explain and demonstrate this project. Start here.
 
 | File | What it is for |
 |---|---|
+| `docs/PREP-LADDER.md` | **Start here if you are studying.** Beginner → advanced in 5 levels, with a runway for 3 days / 1 day / 2 hours. |
 | `docs/INTERVIEW_QUICK_REFERENCE.md` | One page. Read this last, on the way in. |
 | `docs/DEMO_SCRIPT.md` | 7-minute demo and 15-minute technical walkthrough, plus the five strongest points. |
 | `docs/INTERVIEW_MASTER_GUIDE.md` | 90 questions with answers: project, Python/API, AI, automation, database, security, business, plus five hard follow-ups. |
@@ -19,11 +20,12 @@ Everything needed to explain and demonstrate this project. Start here.
 
 ## Status at the time of this pack
 
-- Branch `main`, all commits pushed, **CI green** (`fix(security): read CLIENTFLOW_API_TOKEN…`).
-- **55 tests passing** locally and in CI.
-- Tested: build from clean Linux runner (CI), local Windows run (Python 3.12.16, scikit-learn 1.9.1),
-  demo/reset, CLI, API, dashboard, queue retries and dead letter, approval decisions.
-- Not tested: fresh Windows virtual environment created from scratch; public deployment; real connectors.
+- Branch `main`, all commits pushed, **CI green** (`fix: run without scikit-learn instead of not running at
+  all`, run 44997467327).
+- **58 tests passing** locally (re-verified 22 Nov) and in CI.
+- Verified locally: project `.venv` (Python 3.14.6, scikit-learn 1.9.1), `demo --reset` seeding clean,
+  CLI, dashboard, queue retries and dead letter paths, approval decisions.
+- Not tested: public deployment; real connectors; any UAE contract evaluation.
 
 ## The one-line positioning
 
